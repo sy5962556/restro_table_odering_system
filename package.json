@@ -1,0 +1,26 @@
+{
+  "name": "restaurant-qr-ordering-system",
+  "version": "1.0.0",
+  "description": "Smart Restaurant QR Table Ordering & Management System (MERN)",
+  "scripts": {
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "start": "npm start --prefix server",
+    "build:client": "npm run build --prefix client",
+    "seed": "npm run seed --prefix server",
+    "install:all": "npm install && npm install --prefix server && npm install --prefix client"
+  },
+  "keywords": [
+    "restaurant",
+    "qr-ordering",
+    "mern",
+    "pos",
+    "socketio"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.2.4"
+  }
+}
