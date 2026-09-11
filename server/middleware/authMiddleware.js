@@ -21,7 +21,7 @@ const protect = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super_secret_restaurant_jwt_token_2026_antigravity_pos');
-    const user = await User.findById(decoded.id).select('-password');
+    const user = await User.findById(decoded.id).select('-password').populate('restaurant');
 
     if (!user) {
       return res.status(401).json({
@@ -35,6 +35,32 @@ const protect = async (req, res, next) => {
         success: false,
         message: 'Your account has been deactivated. Please contact the administrator.'
       });
+    }
+
+    // Check restaurant status for non-superadmin staff/owners
+    if (user.role !== 'superadmin' && user.restaurant) {
+      const restStatus = user.restaurant.status || 'APPROVED';
+      if (restStatus === 'PENDING') {
+        return res.status(403).json({
+          success: false,
+          status: 'PENDING',
+          message: 'Your restaurant registration is under review. You will be able to access the system after approval.'
+        });
+      }
+      if (restStatus === 'SUSPENDED') {
+        return res.status(403).json({
+          success: false,
+          status: 'SUSPENDED',
+          message: 'Your restaurant account has been suspended. Please contact platform administration.'
+        });
+      }
+      if (restStatus === 'REJECTED') {
+        return res.status(403).json({
+          success: false,
+          status: 'REJECTED',
+          message: 'Your restaurant registration was rejected by platform administration.'
+        });
+      }
     }
 
     req.user = user;

@@ -133,7 +133,7 @@ export const TableManagementPage = () => {
             </button>
           </div>
 
-          {/* Filters + Refresh */}
+          {/* Filters + Refresh + Add Table */}
           <div className="flex items-center gap-3 flex-wrap">
             <select value={filterFloor} onChange={e => setFilterFloor(e.target.value)} className="px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500">
               <option value="all">All Floors</option>
@@ -141,6 +141,32 @@ export const TableManagementPage = () => {
             </select>
             <button onClick={fetchTables} className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
               <RefreshCw className="w-3.5 h-3.5" /> Refresh
+            </button>
+            <button 
+              onClick={async () => {
+                const tableNum = prompt('Enter Table Number (e.g. 21 or T-21):');
+                if (!tableNum) return;
+                const capacity = prompt('Enter Seating Capacity (e.g. 4):', '4');
+                const section = prompt('Enter Section (e.g. Main Dining, Patio, Rooftop, VIP Lounge):', 'Main Dining');
+                try {
+                  const res = await api.post('/tables', {
+                    tableNumber: tableNum,
+                    tableName: `Table ${tableNum}`,
+                    capacity: parseInt(capacity) || 4,
+                    section: section || 'Main Dining',
+                    floor: 1
+                  });
+                  if (res.data.success) {
+                    alert('Table created successfully with auto-generated QR code!');
+                    fetchTables();
+                  }
+                } catch (err) {
+                  alert(err?.response?.data?.message || 'Failed to create table');
+                }
+              }}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-white text-xs font-bold shadow-md shadow-brand-500/20"
+            >
+              ➕ Add Table
             </button>
             <div className="ml-auto text-xs font-bold text-slate-400">
               {tables.filter(t => t.status !== 'AVAILABLE').length} / {tables.length} tables occupied

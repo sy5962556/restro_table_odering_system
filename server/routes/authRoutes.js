@@ -7,12 +7,19 @@ const {
   getStaff,
   createStaff,
   updateStaff,
-  deleteStaff
+  deleteStaff,
+  forgotPassword,
+  resetPassword,
+  verifyEmail
 } = require('../controllers/authController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.post('/register', register);
+router.post('/register-restaurant', register);
 router.post('/login', login);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
+router.post('/verify-email', verifyEmail);
 router.get('/me', protect, getMe);
 
 // Staff management routes

@@ -45,9 +45,23 @@ export const AuthProvider = ({ children }) => {
   };
 
   const restaurantId = user?.restaurant?._id || user?.restaurant || null;
+  const isSuperAdmin = user?.role === 'superadmin';
+  const restaurantStatus = user?.restaurant?.status || 'APPROVED';
+  const restaurantPlan = user?.restaurant?.plan || 'PRO';
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, isAuthenticated: !!user, restaurantId }}>
+    <AuthContext.Provider value={{
+      user,
+      token,
+      loading,
+      login,
+      logout,
+      isAuthenticated: !!user,
+      restaurantId,
+      isSuperAdmin,
+      restaurantStatus,
+      restaurantPlan
+    }}>
       {children}
     </AuthContext.Provider>
   );

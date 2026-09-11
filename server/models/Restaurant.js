@@ -85,6 +85,36 @@ const restaurantSchema = new mongoose.Schema({
   owner: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  },
+  status: {
+    type: String,
+    enum: ['PENDING', 'APPROVED', 'SUSPENDED', 'REJECTED'],
+    default: 'APPROVED'
+  },
+  plan: {
+    type: String,
+    enum: ['FREE', 'BASIC', 'PRO', 'PREMIUM'],
+    default: 'PRO'
+  },
+  subscriptionStatus: {
+    type: String,
+    enum: ['ACTIVE', 'TRIAL', 'EXPIRED', 'CANCELLED'],
+    default: 'ACTIVE'
+  },
+  subscriptionStart: {
+    type: Date,
+    default: Date.now
+  },
+  subscriptionEnd: {
+    type: Date
+  },
+  publicSlug: {
+    type: String,
+    sparse: true
+  },
+  onboardingCompleted: {
+    type: Boolean,
+    default: true
   }
 }, {
   timestamps: true

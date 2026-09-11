@@ -3,6 +3,11 @@ const mongoose = require('mongoose');
 let memoryServer = null;
 
 const connectDB = async () => {
+  // Reuse existing connection if already connected (vital for serverless connection pooling)
+  if (mongoose.connection.readyState === 1) {
+    return true;
+  }
+
   const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/restaurant_qr_system';
 
   try {
@@ -14,6 +19,13 @@ const connectDB = async () => {
     return true;
   } catch (err) {
     console.warn(`⚠️ External MongoDB connection notice (${mongoUri}): ${err.message}`);
+
+    // On Vercel / serverless environment, in-memory MongoDB binary runner is disabled
+    if (process.env.VERCEL) {
+      console.error('❌ MONGO_URI environment variable must be set in Vercel project settings (e.g., MongoDB Atlas URI).');
+      return false;
+    }
+
     console.log('🔄 Trying embedded in-memory MongoDB fallback...');
 
     try {
@@ -27,9 +39,8 @@ const connectDB = async () => {
     } catch (memErr) {
       console.warn('ℹ️ In-Memory fallback notice:', memErr.message);
       console.log('----------------------------------------------------------------------');
-      console.log('📌 NOTE: Please configure your MONGO_URI in "server/.env" (e.g. MongoDB Atlas free tier URI)');
+      console.log('📌 NOTE: Please configure your MONGO_URI in environment settings (e.g. MongoDB Atlas URI)');
       console.log('   Example: MONGO_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/restaurant_qr_system');
-      console.log('   The API server and WebSocket engine remain online on port', process.env.PORT || 5000);
       console.log('----------------------------------------------------------------------');
       return false;
     }

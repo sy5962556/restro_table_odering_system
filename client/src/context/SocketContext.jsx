@@ -28,6 +28,12 @@ export const SocketProvider = ({ children }) => {
       setConnected(false);
     });
 
+    socketInstance.on('connect_error', (err) => {
+      // In serverless environments (e.g. Vercel), WebSockets may be offline.
+      // Components will automatically rely on HTTP polling.
+      setConnected(false);
+    });
+
     setSocket(socketInstance);
 
     return () => {

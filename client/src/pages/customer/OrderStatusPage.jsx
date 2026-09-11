@@ -60,6 +60,9 @@ export const OrderStatusPage = () => {
 
   useEffect(() => {
     fetchOrder();
+    // Fallback periodic polling for serverless environments (e.g. Vercel)
+    const interval = setInterval(fetchOrder, 10000);
+    return () => clearInterval(interval);
   }, [orderId]);
 
   // Real-time socket events for status updates

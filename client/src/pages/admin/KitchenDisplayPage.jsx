@@ -108,7 +108,12 @@ export const KitchenDisplayPage = () => {
     }
   }, []);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => {
+    fetchOrders();
+    // Fallback periodic polling for serverless environments (e.g. Vercel)
+    const interval = setInterval(fetchOrders, 10000);
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
 
   useEffect(() => {
     if (!socket) return;

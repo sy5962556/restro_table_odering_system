@@ -29,8 +29,12 @@ export const LoginPage = () => {
 
     try {
       const user = await login(email, password);
-      if (user.role === 'kitchen') {
+      if (user.role === 'superadmin') {
+        navigate('/admin/platform');
+      } else if (user.role === 'kitchen') {
         navigate('/admin/kitchen');
+      } else if (user.role === 'waiter' || user.role === 'cashier') {
+        navigate('/admin/orders');
       } else {
         navigate('/admin/dashboard');
       }
@@ -55,10 +59,10 @@ export const LoginPage = () => {
             🍽️
           </div>
           <h1 className="text-2xl font-black tracking-tight text-white">
-            The Royal Spice POS
+            Smart QR Restaurant Platform
           </h1>
           <p className="text-xs text-slate-400">
-            Sign in to access management dashboard, KDS & analytics
+            Multi-Tenant SaaS Platform & Management Portal
           </p>
         </div>
 
@@ -81,7 +85,7 @@ export const LoginPage = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@restaurant.com"
+                placeholder="owner@restaurant.com"
                 className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-800/80 border border-slate-700 text-white text-xs placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
               />
             </div>
@@ -117,64 +121,79 @@ export const LoginPage = () => {
         {/* 1-Click Quick Demo Login Pill Buttons */}
         <div className="pt-4 border-t border-slate-800 space-y-2.5">
           <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-            <span>⚡ Quick Demo Logins:</span>
-            <span className="text-amber-400">1-Click Fill</span>
+            <span>⚡ Test Staff Logins:</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             <button
               type="button"
               onClick={() => fillQuickCredentials('admin@restaurant.com', 'Admin@123')}
-              className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/80 hover:bg-slate-800 hover:border-amber-500 transition-all text-left text-xs space-y-0.5"
+              className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/80 hover:bg-slate-800 hover:border-amber-500 transition-all text-left text-xs space-y-0.5"
             >
-              <div className="flex items-center gap-1.5 font-bold text-white">
-                <span>👑 Owner / Admin</span>
-              </div>
-              <p className="text-[10px] text-slate-400">Full platform access</p>
+              <div className="font-bold text-white text-[11px]">🏛️ Owner</div>
+              <p className="text-[9px] text-slate-400">Full Access</p>
             </button>
 
             <button
               type="button"
               onClick={() => fillQuickCredentials('manager@restaurant.com', 'Manager@123')}
-              className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/80 hover:bg-slate-800 hover:border-brand-500 transition-all text-left text-xs space-y-0.5"
+              className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/80 hover:bg-slate-800 hover:border-emerald-500 transition-all text-left text-xs space-y-0.5"
             >
-              <div className="flex items-center gap-1.5 font-bold text-white">
-                <span>👔 Manager</span>
-              </div>
-              <p className="text-[10px] text-slate-400">Orders, Bills, Tables</p>
+              <div className="font-bold text-white text-[11px]">👔 Manager</div>
+              <p className="text-[9px] text-slate-400">Ops & Staff</p>
             </button>
 
             <button
               type="button"
               onClick={() => fillQuickCredentials('kitchen@restaurant.com', 'Kitchen@123')}
-              className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/80 hover:bg-slate-800 hover:border-orange-500 transition-all text-left text-xs space-y-0.5"
+              className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/80 hover:bg-slate-800 hover:border-orange-500 transition-all text-left text-xs space-y-0.5"
             >
-              <div className="flex items-center gap-1.5 font-bold text-white">
-                <span>🍳 Kitchen Chef</span>
-              </div>
-              <p className="text-[10px] text-slate-400">Live KDS & KOTs</p>
+              <div className="font-bold text-white text-[11px]">🍳 Chef</div>
+              <p className="text-[9px] text-slate-400">KDS & Menu</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => fillQuickCredentials('waiter@restaurant.com', 'Waiter@123')}
+              className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/80 hover:bg-slate-800 hover:border-blue-500 transition-all text-left text-xs space-y-0.5"
+            >
+              <div className="font-bold text-white text-[11px]">🤵 Waiter</div>
+              <p className="text-[9px] text-slate-400">Orders & Floor</p>
             </button>
 
             <button
               type="button"
               onClick={() => fillQuickCredentials('cashier@restaurant.com', 'Cashier@123')}
-              className="p-2.5 rounded-xl bg-slate-800/60 border border-slate-700/80 hover:bg-slate-800 hover:border-emerald-500 transition-all text-left text-xs space-y-0.5"
+              className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/80 hover:bg-slate-800 hover:border-purple-500 transition-all text-left text-xs space-y-0.5"
             >
-              <div className="flex items-center gap-1.5 font-bold text-white">
-                <span>💰 Cashier</span>
-              </div>
-              <p className="text-[10px] text-slate-400">Billing & Settlement</p>
+              <div className="font-bold text-white text-[11px]">💰 Cashier</div>
+              <p className="text-[9px] text-slate-400">Bills & Offers</p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => fillQuickCredentials('superadmin@platform.com', 'Admin@123')}
+              className="p-2 rounded-xl bg-purple-950/60 border border-purple-800/80 hover:bg-purple-900 transition-all text-left text-xs space-y-0.5"
+            >
+              <div className="font-bold text-purple-300 text-[11px]">👑 Super Admin</div>
+              <p className="text-[9px] text-purple-400">Platform</p>
             </button>
           </div>
         </div>
 
-        {/* QR Simulator Direct Link */}
-        <div className="text-center pt-2">
+        <div className="pt-2 text-center space-y-2">
+          <button
+            onClick={() => navigate('/register')}
+            className="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-700 text-brand-400 border border-slate-700 transition"
+          >
+            ➕ Register New Restaurant Workspace
+          </button>
+
           <button
             onClick={() => navigate('/simulator')}
-            className="text-xs text-amber-400 font-bold hover:underline"
+            className="text-xs text-slate-400 font-bold hover:underline block mx-auto"
           >
-            Looking for Customer QR Ordering? Launch Simulator →
+            Launch Customer QR Simulator →
           </button>
         </div>
       </div>

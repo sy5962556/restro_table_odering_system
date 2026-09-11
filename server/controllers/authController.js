@@ -25,41 +25,104 @@ const sendTokenResponse = (user, statusCode, res) => {
   });
 };
 
-// @desc    Register a new Owner / Admin user
-// @route   POST /api/auth/register
+// @desc    Register a new Multi-Tenant Restaurant + Owner Account
+// @route   POST /api/auth/register-restaurant
 // @access  Public
-exports.register = async (req, res, next) => {
+exports.registerRestaurant = async (req, res, next) => {
   try {
-    const { name, email, password, mobile, role, restaurantName } = req.body;
-
-    // Check if user already exists
-    let user = await User.findOne({ email });
-    if (user) {
-      return res.status(400).json({ success: false, message: 'User already exists with this email' });
-    }
-
-    // If registering as owner and restaurantName provided, create default restaurant
-    let restaurantId = null;
-    if (role === 'owner' || !role) {
-      const restaurant = await Restaurant.create({
-        name: restaurantName || `${name}'s Restaurant`,
-        email: email,
-        phone: mobile || '+91 98765 43210'
-      });
-      restaurantId = restaurant._id;
-    }
-
-    user = await User.create({
+    const {
       name,
       email,
       password,
       mobile,
-      role: role || 'owner',
-      restaurant: restaurantId
+      restaurantName,
+      description,
+      phone,
+      address,
+      gstNumber,
+      currency,
+      taxRate,
+      serviceChargeRate,
+      numberOfTables,
+      requireApproval
+    } = req.body;
+
+    if (!name || !email || !password || !restaurantName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Owner name, email, password, and restaurant name are required.'
+      });
+    }
+
+    // Check existing email
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'An account with this email already exists.' });
+    }
+
+    // Create Restaurant
+    const initialStatus = requireApproval ? 'PENDING' : 'APPROVED';
+    const restaurant = await Restaurant.create({
+      name: restaurantName,
+      description: description || 'Welcome to our restaurant! Order online directly from your table.',
+      email: email,
+      phone: phone || mobile || '+91 98765 43210',
+      address: address || { street: 'Main Street', city: 'City', state: 'State', pincode: '000000', country: 'India' },
+      gstNumber: gstNumber || '',
+      currency: currency || '₹',
+      taxRate: taxRate !== undefined ? Number(taxRate) : 5,
+      serviceChargeRate: serviceChargeRate !== undefined ? Number(serviceChargeRate) : 2.5,
+      status: initialStatus,
+      onboardingCompleted: false
     });
 
-    if (restaurantId) {
-      await Restaurant.findByIdAndUpdate(restaurantId, { owner: user._id });
+    // Create Owner User
+    const user = await User.create({
+      name,
+      email,
+      password,
+      mobile,
+      role: 'owner',
+      restaurant: restaurant._id
+    });
+
+    restaurant.owner = user._id;
+    await restaurant.save();
+
+    // Generate Default Categories for New Restaurant
+    const Category = require('../models/Category');
+    const defaultCategories = ['Starters & Snacks', 'Main Course', 'Beverages & Drinks', 'Desserts'];
+    for (let i = 0; i < defaultCategories.length; i++) {
+      await Category.create({
+        restaurant: restaurant._id,
+        name: defaultCategories[i],
+        displayOrder: i + 1
+      });
+    }
+
+    // Generate Default Tables for New Restaurant
+    const Table = require('../models/Table');
+    const QRCode = require('../models/QRCode');
+    const { generateTableToken } = require('../utils/qrGenerator');
+    const tableCount = parseInt(numberOfTables) || 5;
+    for (let t = 1; t <= tableCount; t++) {
+      const tableNum = `T-${t < 10 ? '0' + t : t}`;
+      const qrToken = generateTableToken(tableNum);
+      const table = await Table.create({
+        restaurant: restaurant._id,
+        tableNumber: tableNum,
+        tableName: `Table ${t}`,
+        capacity: t <= 2 ? 2 : (t <= 4 ? 4 : 6),
+        section: t <= 3 ? 'Main Dining' : 'Patio',
+        qrCodeToken: qrToken
+      });
+
+      await QRCode.create({
+        restaurant: restaurant._id,
+        table: table._id,
+        qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(`http://localhost:5173/order/${restaurant._id}/${table._id}`)}`,
+        targetUrl: `http://localhost:5173/order/${restaurant._id}/${table._id}`
+      });
     }
 
     sendTokenResponse(user, 201, res);
@@ -67,6 +130,9 @@ exports.register = async (req, res, next) => {
     next(err);
   }
 };
+
+// Legacy single-step register route wrapper
+exports.register = exports.registerRestaurant;
 
 // @desc    Login user
 // @route   POST /api/auth/login
@@ -198,3 +264,91 @@ exports.deleteStaff = async (req, res, next) => {
     next(err);
   }
 };
+
+// @desc    Forgot Password - Request reset token
+// @route   POST /api/auth/forgot-password
+// @access  Public
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const crypto = require('crypto');
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'No account registered with that email' });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(20).toString('hex');
+    user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    user.resetPasswordExpire = Date.now() + 30 * 60 * 1000; // 30 mins
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset token generated successfully',
+      resetToken // Returned for testing / email delivery
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Reset Password using token
+// @route   POST /api/auth/reset-password
+// @access  Public
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { resetToken, newPassword } = req.body;
+    const crypto = require('crypto');
+
+    if (!resetToken || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Reset token and new password are required' });
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpire: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired password reset token' });
+    }
+
+    user.password = newPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    sendTokenResponse(user, 200, res);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Verify Email Address Token
+// @route   POST /api/auth/verify-email
+// @access  Public
+exports.verifyEmail = async (req, res, next) => {
+  try {
+    const { verificationToken } = req.body;
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) {
+      return res.status(400).json({ success: false, message: 'Invalid email verification token' });
+    }
+
+    user.emailVerified = true;
+    user.verificationToken = undefined;
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      message: 'Email address verified successfully'
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

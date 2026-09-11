@@ -26,6 +26,10 @@ const FeedbackPage              = lazy(() => import('./pages/admin/FeedbackPage'
 const QRCodeManagerPage         = lazy(() => import('./pages/admin/QRCodeManagerPage'));
 const StaffManagementPage       = lazy(() => import('./pages/admin/StaffManagementPage'));
 const SettingsPage              = lazy(() => import('./pages/admin/SettingsPage'));
+const RegisterRestaurantPage    = lazy(() => import('./pages/RegisterRestaurantPage'));
+const SuperAdminDashboardPage   = lazy(() => import('./pages/admin/SuperAdminDashboardPage'));
+const OnboardingWizardPage       = lazy(() => import('./pages/admin/OnboardingWizardPage'));
+import { PendingReviewScreen, SuspendedAccountScreen } from './pages/admin/StatusScreens';
 
 // Full-page loading spinner
 function PageLoader() {
@@ -41,7 +45,7 @@ function PageLoader() {
 
 // Protected Admin Route wrapper
 function RequireAuth({ allowedRoles }) {
-  const { user, loading } = useAuth();
+  const { user, loading, restaurantStatus } = useAuth();
 
   if (loading) return <PageLoader />;
   
@@ -49,8 +53,20 @@ function RequireAuth({ allowedRoles }) {
     return <Navigate to="/admin/login" replace />;
   }
 
+  // Handle restaurant status for non-superadmin users
+  if (user.role !== 'superadmin') {
+    if (restaurantStatus === 'PENDING') {
+      return <PendingReviewScreen />;
+    }
+    if (restaurantStatus === 'SUSPENDED') {
+      return <SuspendedAccountScreen />;
+    }
+  }
+
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // Redirect kitchen staff directly to KDS
+    if (user.role === 'superadmin') {
+      return <Navigate to="/admin/platform" replace />;
+    }
     if (user.role === 'kitchen') {
       return <Navigate to="/admin/kitchen" replace />;
     }
@@ -85,10 +101,21 @@ export default function App() {
                   {/* ─── QR SIMULATOR ─── */}
                   <Route path="/simulator" element={<QRScannerSimulatorPage />} />
 
-                  {/* ─── ADMIN AUTH ─── */}
+                  {/* ─── PUBLIC SAAS REGISTRATION & AUTH ─── */}
+                  <Route path="/register" element={<RegisterRestaurantPage />} />
+                  <Route path="/register-restaurant" element={<RegisterRestaurantPage />} />
                   <Route path="/admin/login" element={<LoginPage />} />
 
-                  {/* ─── PROTECTED ADMIN ROUTES ─── */}
+                  {/* ─── SUPER ADMIN PLATFORM CONTROL CENTER ─── */}
+                  <Route element={<RequireAuth allowedRoles={['superadmin']} />}>
+                    <Route path="/admin/platform" element={<SuperAdminDashboardPage />} />
+                  </Route>
+
+                  {/* ─── PROTECTED ADMIN & RESTAURANT WORKSPACE ROUTES ─── */}
+                  {/* Onboarding Guide */}
+                  <Route element={<RequireAuth allowedRoles={['superadmin', 'owner']} />}>
+                    <Route path="/admin/onboarding" element={<OnboardingWizardPage />} />
+                  </Route>
                   {/* All Staff */}
                   <Route element={<RequireAuth allowedRoles={['superadmin', 'owner', 'manager', 'kitchen', 'waiter', 'cashier']} />}>
                     <Route path="/admin/kitchen" element={<KitchenDisplayPage />} />

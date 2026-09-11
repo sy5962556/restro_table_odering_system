@@ -28,7 +28,9 @@ const { generateTableToken, generateQRCodeDataUrl } = require('../utils/qrGenera
 const seedDatabase = async () => {
   try {
     console.log('🌱 Starting database seeding...');
-    await connectDB();
+    if (mongoose.connection.readyState === 0) {
+      await connectDB();
+    }
 
     // Clear all existing collections
     console.log('🧹 Clearing old collections...');
@@ -49,8 +51,19 @@ const seedDatabase = async () => {
     await WaiterCall.deleteMany();
     await AuditLog.deleteMany();
 
-    // 1. Create Restaurant
-    console.log('🏛️ Creating Restaurant...');
+    // 1. Create Super Admin User
+    console.log('👑 Creating Super Admin User...');
+    const superAdmin = await User.create({
+      name: 'Platform Super Admin',
+      email: 'superadmin@platform.com',
+      password: 'Admin@123',
+      mobile: '+91 90000 00000',
+      role: 'superadmin',
+      permissions: ['SUPER_ADMIN_FULL_ACCESS']
+    });
+
+    // 2. Create Restaurant A (Approved)
+    console.log('🏛️ Creating Restaurant A (Royal Spice)...');
     const restaurant = await Restaurant.create({
       name: 'The Royal Spice Lounge & Fine Dine',
       tagline: 'Authentic Indian, Pan-Asian & Tandoor Delicacies',
@@ -69,19 +82,78 @@ const seedDatabase = async () => {
       gstNumber: '29AABCR1234F1Z8',
       currency: '₹',
       currencyCode: 'INR',
-      taxRate: 5.0, // 5% GST
-      serviceChargeRate: 2.5, // 2.5% Service Charge
+      taxRate: 5.0,
+      serviceChargeRate: 2.5,
       packagingCharge: 0,
       upiId: 'royalspice@okhdfcbank',
       upiMerchantName: 'The Royal Spice Lounge',
       openingHours: { open: '11:30 AM', close: '11:45 PM' },
       isAcceptingOrders: true,
-      loyaltySettings: {
-        pointsPer100: 1,
-        pointValue: 1,
-        minRedeemPoints: 20
-      }
+      status: 'APPROVED',
+      plan: 'PRO'
     });
+
+    // 2b. Create Restaurant B (Urban Cafe - Approved)
+    console.log('☕ Creating Restaurant B (Urban Cafe)...');
+    const restaurantB = await Restaurant.create({
+      name: 'Urban Cafe & Artisan Bistro',
+      tagline: 'Gourmet Coffee, Wood-Fired Pizzas & Smash Burgers',
+      description: 'Trendy bistro serving specialty espresso, hand-stretched pizzas, and artisan pastries.',
+      logo: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=500&auto=format&fit=crop&q=80',
+      address: { street: '12 MG Road', city: 'Bengaluru', state: 'Karnataka', pincode: '560001', country: 'India' },
+      phone: '+91 98765 22334',
+      email: 'contact@urbancafe.com',
+      status: 'APPROVED',
+      plan: 'BASIC'
+    });
+
+    const ownerB = await User.create({
+      name: 'Karan Malhotra',
+      email: 'ownerB@restaurant.com',
+      password: 'Owner@123',
+      mobile: '+91 98765 99887',
+      role: 'owner',
+      restaurant: restaurantB._id
+    });
+    restaurantB.owner = ownerB._id;
+    await restaurantB.save();
+
+    // Create Category & Items for Restaurant B
+    const catB = await Category.create({ restaurant: restaurantB._id, name: 'Gourmet Pizzas & Burgers', displayOrder: 1 });
+    const tableB1 = await Table.create({ restaurant: restaurantB._id, tableNumber: 'UB-01', tableName: 'Cafe Table 1', capacity: 4, qrCodeToken: 'UB-01-TOKEN' });
+    const itemB1 = await MenuItem.create({
+      restaurant: restaurantB._id,
+      category: catB._id,
+      name: 'Truffle Mushroom Wood-Fired Pizza',
+      description: 'Artisanal sourdough crust topped with wild mushroom ragout and white truffle oil.',
+      image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=80',
+      price: 520,
+      foodType: 'veg'
+    });
+
+    // 2c. Create Restaurant C (Pending Review)
+    console.log('⏳ Creating Restaurant C (Pending Review)...');
+    const restaurantC = await Restaurant.create({
+      name: 'Tandoori Nights & Bar',
+      tagline: 'Late Night Sizzlers & Drinks',
+      description: 'Pending admin review for platform onboarding.',
+      logo: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=500&auto=format&fit=crop&q=80',
+      phone: '+91 99887 76655',
+      email: 'ownerC@restaurant.com',
+      status: 'PENDING',
+      plan: 'FREE'
+    });
+
+    const ownerC = await User.create({
+      name: 'Siddharth Rao',
+      email: 'ownerC@restaurant.com',
+      password: 'Owner@123',
+      mobile: '+91 99887 76655',
+      role: 'owner',
+      restaurant: restaurantC._id
+    });
+    restaurantC.owner = ownerC._id;
+    await restaurantC.save();
 
     // 2. Create Users / Staff
     console.log('👥 Creating Staff Users...');

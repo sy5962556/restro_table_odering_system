@@ -34,21 +34,32 @@ export const AdminSidebar = ({ isOpen, onClose }) => {
   };
 
   const navItems = [
-    { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/admin/orders', icon: ShoppingBag, label: 'Live Orders' },
-    { to: '/admin/kitchen', icon: ChefHat, label: 'Kitchen KDS' },
-    { to: '/admin/tables', icon: Grid, label: 'Table Floor Plan' },
-    { to: '/admin/table-analytics', icon: Activity, label: 'Table Heatmap' },
-    { to: '/admin/menu', icon: Utensils, label: 'Menu & Dishes' },
-    { to: '/admin/inventory', icon: Boxes, label: 'Inventory Stock' },
-    { to: '/admin/offers', icon: Tag, label: 'Offers & Coupons' },
-    { to: '/admin/customers', icon: Users, label: 'Customer Loyalty' },
-    { to: '/admin/analytics', icon: BarChart3, label: 'Reports & Forecasts' },
-    { to: '/admin/feedback', icon: MessageSquareHeart, label: 'Guest Feedback' },
-    { to: '/admin/qr-codes', icon: QrCode, label: 'QR Code Standees' },
-    { to: '/admin/staff', icon: ShieldCheck, label: 'Staff Management' },
-    { to: '/admin/settings', icon: Settings, label: 'Restaurant Settings' },
+    { to: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['superadmin', 'owner', 'manager'] },
+    { to: '/admin/orders', icon: ShoppingBag, label: 'Live Orders', roles: ['superadmin', 'owner', 'manager', 'kitchen', 'waiter', 'cashier'] },
+    { to: '/admin/kitchen', icon: ChefHat, label: 'Kitchen KDS', roles: ['superadmin', 'owner', 'manager', 'kitchen', 'waiter'] },
+    { to: '/admin/tables', icon: Grid, label: 'Table Floor Plan', roles: ['superadmin', 'owner', 'manager', 'waiter', 'cashier'] },
+    { to: '/admin/table-analytics', icon: Activity, label: 'Table Heatmap', roles: ['superadmin', 'owner', 'manager'] },
+    { to: '/admin/menu', icon: Utensils, label: 'Menu & Dishes', roles: ['superadmin', 'owner', 'manager', 'kitchen'] },
+    { to: '/admin/inventory', icon: Boxes, label: 'Inventory Stock', roles: ['superadmin', 'owner', 'manager', 'kitchen'] },
+    { to: '/admin/offers', icon: Tag, label: 'Offers & Coupons', roles: ['superadmin', 'owner', 'manager', 'cashier'] },
+    { to: '/admin/customers', icon: Users, label: 'Customer Loyalty', roles: ['superadmin', 'owner', 'manager', 'cashier'] },
+    { to: '/admin/analytics', icon: BarChart3, label: 'Reports & Forecasts', roles: ['superadmin', 'owner', 'manager', 'cashier'] },
+    { to: '/admin/feedback', icon: MessageSquareHeart, label: 'Guest Feedback', roles: ['superadmin', 'owner', 'manager', 'waiter'] },
+    { to: '/admin/qr-codes', icon: QrCode, label: 'QR Code Standees', roles: ['superadmin', 'owner', 'manager'] },
+    { to: '/admin/staff', icon: ShieldCheck, label: 'Staff Management', roles: ['superadmin', 'owner', 'manager'] },
+    { to: '/admin/settings', icon: Settings, label: 'Restaurant Settings', roles: ['superadmin', 'owner', 'manager'] },
   ];
+
+  const userRole = user?.role || 'manager';
+
+  // Filter sidebar navigation links based on user role & permissions
+  const visibleNavItems = navItems.filter((item) => {
+    if (userRole === 'superadmin' || userRole === 'owner') return true;
+    if (user?.permissions && Array.isArray(user.permissions) && user.permissions.length > 0) {
+      if (user.permissions.includes(item.to)) return true;
+    }
+    return item.roles.includes(userRole);
+  });
 
   return (
     <>
@@ -70,11 +81,11 @@ export const AdminSidebar = ({ isOpen, onClose }) => {
               🍽️
             </div>
             <div>
-              <h2 className="font-black text-sm text-slate-900 dark:text-white tracking-tight leading-tight">
-                Royal Spice POS
+              <h2 className="font-black text-sm text-slate-900 dark:text-white tracking-tight leading-tight truncate max-w-[140px]">
+                {user?.restaurant?.name || 'Smart Restaurant POS'}
               </h2>
               <span className="text-[10px] font-extrabold uppercase tracking-wider text-brand-600 dark:text-brand-400">
-                Management System
+                Workspace
               </span>
             </div>
           </div>
@@ -89,7 +100,24 @@ export const AdminSidebar = ({ isOpen, onClose }) => {
 
         {/* Scrollable Nav Items */}
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
-          {navItems.map((item) => {
+          {user?.role === 'superadmin' && (
+            <NavLink
+              to="/admin/platform"
+              onClick={onClose}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-bold text-xs transition-all mb-2 ${
+                  isActive
+                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
+                    : 'bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border border-purple-500/20'
+                }`
+              }
+            >
+              <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
+              <span>👑 Super Admin Portal</span>
+            </NavLink>
+          )}
+
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
@@ -121,7 +149,14 @@ export const AdminSidebar = ({ isOpen, onClose }) => {
               </div>
               <div className="leading-tight">
                 <p className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[100px]">{user?.name || 'Staff'}</p>
-                <span className="text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400">{user?.role || 'Manager'}</span>
+                <span className="text-[10px] font-extrabold uppercase text-amber-600 dark:text-amber-400">
+                  {userRole === 'kitchen' ? '🍳 KITCHEN CHEF' :
+                   userRole === 'waiter' ? '🤵 WAITER STAFF' :
+                   userRole === 'cashier' ? '💰 CASHIER' :
+                   userRole === 'manager' ? '👔 MANAGER' :
+                   userRole === 'owner' ? '🏛️ OWNER' :
+                   userRole === 'superadmin' ? '👑 SUPER ADMIN' : userRole.toUpperCase()}
+                </span>
               </div>
             </div>
 

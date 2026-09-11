@@ -8,18 +8,23 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "start": "npm start --prefix server",
     "build:client": "npm run build --prefix client",
+    "vercel-build": "npm install --prefix client && npm run build:client",
     "seed": "npm run seed --prefix server",
     "install:all": "npm install && npm install --prefix server && npm install --prefix client"
   },
-  "keywords": [
-    "restaurant",
-    "qr-ordering",
-    "mern",
-    "pos",
-    "socketio"
-  ],
-  "author": "Antigravity",
-  "license": "MIT",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "morgan": "^1.10.0",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.10.0",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1"
+  },
   "devDependencies": {
     "concurrently": "^9.2.4"
   }

@@ -39,6 +39,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Mount Routes
+app.use('/api/platform', require('./routes/platformAdminRoutes'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/restaurants', require('./routes/restaurantRoutes'));
 app.use('/api/tables', require('./routes/tableRoutes'));
@@ -71,7 +72,7 @@ const PORT = process.env.PORT || 5000;
 // Start Server and connect DB
 const startServer = async () => {
   try {
-    server.listen(PORT, () => {
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server listening in ${process.env.NODE_ENV || 'development'} mode on http://localhost:${PORT}`);
     });
 
@@ -82,8 +83,12 @@ const startServer = async () => {
       const count = await Restaurant.countDocuments();
       if (count === 0) {
         console.log('📦 Empty database detected. Auto-populating initial restaurant data...');
-        const seedDatabase = require('./seed/seedData');
-        await seedDatabase();
+        try {
+          const seedDatabase = require('./seed/seedData');
+          await seedDatabase();
+        } catch (seedErr) {
+          console.error('⚠️ Notice during initial seeding:', seedErr.message);
+        }
       }
     }
   } catch (err) {

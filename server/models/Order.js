@@ -183,4 +183,8 @@ const orderSchema = new mongoose.Schema({
   timestamps: true
 });
 
+orderSchema.index({ restaurant: 1, createdAt: -1 });
+orderSchema.index({ restaurant: 1, orderStatus: 1 });
+orderSchema.index({ restaurant: 1, orderNumber: 1 });
+
 module.exports = mongoose.model('Order', orderSchema);
