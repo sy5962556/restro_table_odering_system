@@ -359,16 +359,20 @@ exports.resetRestaurantPassword = async (req, res, next) => {
 // @access  Private (Super Admin)
 exports.getTenantControlData = async (req, res, next) => {
   try {
-    const restaurant = await Restaurant.findById(req.params.id).populate('owner', 'name email mobile role createdAt');
+    const restaurant = await Restaurant.findById(req.params.id).populate(
+      'owner',
+      'name email mobile role createdAt lastLogin isActive'
+    );
     if (!restaurant) {
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
 
-    const [totalOrders, totalMenuItems, totalTables, totalStaff] = await Promise.all([
+    const [totalOrders, totalMenuItems, totalTables, totalStaff, totalCategories] = await Promise.all([
       Order.countDocuments({ restaurant: restaurant._id }),
       MenuItem.countDocuments({ restaurant: restaurant._id }),
       Table.countDocuments({ restaurant: restaurant._id }),
-      User.countDocuments({ restaurant: restaurant._id })
+      User.countDocuments({ restaurant: restaurant._id }),
+      Category.countDocuments({ restaurant: restaurant._id })
     ]);
 
     const activeOrders = await Order.countDocuments({
@@ -391,6 +395,16 @@ exports.getTenantControlData = async (req, res, next) => {
     const tables = await Table.find({ restaurant: restaurant._id }).sort('tableNumber');
     const staffList = await User.find({ restaurant: restaurant._id }).select('-password');
 
+    // Database footprint: collection item counts per entity
+    const footprint = [
+      { collection: 'User Accounts', count: totalStaff },
+      { collection: 'Orders', count: totalOrders },
+      { collection: 'Menu Items', count: totalMenuItems },
+      { collection: 'Categories', count: totalCategories },
+      { collection: 'Tables', count: totalTables },
+      { collection: 'QR Codes', count: await QRCode.countDocuments({ restaurant: restaurant._id }) },
+    ];
+
     res.status(200).json({
       success: true,
       restaurant,
@@ -400,8 +414,10 @@ exports.getTenantControlData = async (req, res, next) => {
         totalRevenue: Math.round(revAgg[0]?.total || 0),
         totalMenuItems,
         totalTables,
-        totalStaff
+        totalStaff,
+        totalCategories
       },
+      footprint,
       categories,
       menuItems,
       tables,
