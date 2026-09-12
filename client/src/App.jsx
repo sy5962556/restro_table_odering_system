@@ -27,8 +27,8 @@ const QRCodeManagerPage         = lazy(() => import('./pages/admin/QRCodeManager
 const StaffManagementPage       = lazy(() => import('./pages/admin/StaffManagementPage'));
 const SettingsPage              = lazy(() => import('./pages/admin/SettingsPage'));
 const RegisterRestaurantPage    = lazy(() => import('./pages/RegisterRestaurantPage'));
-const SuperAdminDashboardPage   = lazy(() => import('./pages/admin/SuperAdminDashboardPage'));
-const OnboardingWizardPage       = lazy(() => import('./pages/admin/OnboardingWizardPage'));
+const SuperAdminControlCenter = lazy(() => import('./pages/admin/SuperAdminControlCenter'));
+const OnboardingWizardPage     = lazy(() => import('./pages/admin/OnboardingWizardPage'));
 import { PendingReviewScreen, SuspendedAccountScreen } from './pages/admin/StatusScreens';
 
 // Full-page loading spinner
@@ -108,7 +108,8 @@ export default function App() {
 
                   {/* ─── SUPER ADMIN PLATFORM CONTROL CENTER ─── */}
                   <Route element={<RequireAuth allowedRoles={['superadmin']} />}>
-                    <Route path="/admin/platform" element={<SuperAdminDashboardPage />} />
+                    <Route path="/admin/platform" element={<SuperAdminControlCenter />} />
+                    <Route path="/super-admin/*" element={<SuperAdminControlCenter />} />
                   </Route>
 
                   {/* ─── PROTECTED ADMIN & RESTAURANT WORKSPACE ROUTES ─── */}

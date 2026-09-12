@@ -22,12 +22,20 @@ const restaurantSchema = new mongoose.Schema({
     type: String,
     default: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80'
   },
+  restaurantCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
+  },
   address: {
     street: { type: String, default: '108 Gourmet Boulevard' },
     city: { type: String, default: 'Bengaluru' },
     state: { type: String, default: 'Karnataka' },
     pincode: { type: String, default: '560001' },
-    country: { type: String, default: 'India' }
+    country: { type: String, default: 'India' },
+    lat: { type: Number, default: 12.9716 },
+    lng: { type: Number, default: 77.5946 }
   },
   phone: {
     type: String,

@@ -2,8 +2,13 @@ const Restaurant = require('../models/Restaurant');
 const User = require('../models/User');
 const Order = require('../models/Order');
 const MenuItem = require('../models/MenuItem');
+const Category = require('../models/Category');
 const Table = require('../models/Table');
+const QRCode = require('../models/QRCode');
 const AuditLog = require('../models/AuditLog');
+const ClickLog = require('../models/ClickLog');
+const crypto = require('crypto');
+const { generateTableToken, generateQRCodeDataUrl } = require('../utils/qrGenerator');
 
 // @desc    Get Platform-Wide Dashboard KPIs
 // @route   GET /api/platform/dashboard
@@ -36,6 +41,12 @@ exports.getPlatformDashboard = async (req, res, next) => {
       .sort('-createdAt')
       .limit(5);
 
+    // Recent Audit Activity Logs
+    const recentAuditLogs = await AuditLog.find()
+      .populate('restaurant', 'name')
+      .sort('-createdAt')
+      .limit(8);
+
     res.status(200).json({
       success: true,
       stats: {
@@ -47,7 +58,82 @@ exports.getPlatformDashboard = async (req, res, next) => {
         totalOrders,
         totalRevenue: Math.round(totalRevenue)
       },
-      recentRestaurants
+      recentRestaurants,
+      recentAuditLogs
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get Restaurant Tree Hierarchy Data
+// @route   GET /api/platform/tree
+// @access  Private (Super Admin)
+exports.getRestaurantTree = async (req, res, next) => {
+  try {
+    const { status, search } = req.query;
+    const query = {};
+
+    if (status && status !== 'ALL') {
+      query.status = status;
+    }
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { restaurantCode: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const restaurants = await Restaurant.find(query)
+      .populate('owner', 'name email mobile')
+      .sort('-createdAt');
+
+    // Build hierarchical tree nodes with child metrics
+    const tree = await Promise.all(restaurants.map(async (rest, idx) => {
+      const code = rest.restaurantCode || `REST-${String(idx + 1).padStart(5, '0')}`;
+      
+      const [usersCount, menuCount, tablesCount, ordersCount] = await Promise.all([
+        User.countDocuments({ restaurant: rest._id }),
+        MenuItem.countDocuments({ restaurant: rest._id }),
+        Table.countDocuments({ restaurant: rest._id }),
+        Order.countDocuments({ restaurant: rest._id })
+      ]);
+
+      const revAgg = await Order.aggregate([
+        { $match: { restaurant: rest._id } },
+        { $group: { _id: null, rev: { $sum: '$grandTotal' } } }
+      ]);
+
+      return {
+        _id: rest._id,
+        id: code,
+        name: rest.name,
+        restaurantCode: code,
+        status: rest.status,
+        plan: rest.plan,
+        subscriptionStatus: rest.subscriptionStatus || 'ACTIVE',
+        logo: rest.logo,
+        email: rest.email || rest.owner?.email,
+        phone: rest.phone,
+        city: rest.address?.city || 'Main',
+        ownerName: rest.owner?.name || 'Owner',
+        isOnline: rest.isAcceptingOrders,
+        metrics: {
+          usersCount,
+          menuCount,
+          tablesCount,
+          ordersCount,
+          revenue: Math.round(revAgg[0]?.rev || 0)
+        }
+      };
+    }));
+
+    res.status(200).json({
+      success: true,
+      count: tree.length,
+      tree
     });
   } catch (err) {
     next(err);
@@ -62,11 +148,12 @@ exports.getAllRestaurants = async (req, res, next) => {
     const { status, plan, search } = req.query;
     const query = {};
 
-    if (status) query.status = status;
-    if (plan) query.plan = plan;
+    if (status && status !== 'ALL') query.status = status;
+    if (plan && plan !== 'ALL') query.plan = plan;
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
+        { restaurantCode: { $regex: search, $options: 'i' } },
         { email: { $regex: search, $options: 'i' } },
         { phone: { $regex: search, $options: 'i' } }
       ];
@@ -76,9 +163,10 @@ exports.getAllRestaurants = async (req, res, next) => {
       .populate('owner', 'name email mobile role')
       .sort('-createdAt');
 
-    // Attach order & revenue counts per restaurant
-    const enriched = await Promise.all(restaurants.map(async (rest) => {
+    const enriched = await Promise.all(restaurants.map(async (rest, idx) => {
       const restObj = rest.toObject();
+      restObj.restaurantCode = rest.restaurantCode || `REST-${String(idx + 1).padStart(5, '0')}`;
+      
       const orderAgg = await Order.aggregate([
         { $match: { restaurant: rest._id } },
         { $group: { _id: null, totalOrders: { $sum: 1 }, totalSales: { $sum: '$grandTotal' } } }
@@ -145,7 +233,7 @@ exports.getRestaurantDetails = async (req, res, next) => {
 exports.updateRestaurantStatus = async (req, res, next) => {
   try {
     const { status } = req.body;
-    if (!['PENDING', 'APPROVED', 'SUSPENDED', 'REJECTED'].includes(status)) {
+    if (!['PENDING', 'APPROVED', 'SUSPENDED', 'REJECTED', 'INACTIVE'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Invalid status value' });
     }
 
@@ -159,16 +247,15 @@ exports.updateRestaurantStatus = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
 
-    // Log action
     await AuditLog.create({
       restaurant: restaurant._id,
       user: req.user._id,
       userName: req.user.name,
       userRole: req.user.role,
-      action: `RESTAURANT_STATUS_CHANGED_TO_${status}`,
+      action: `RESTAURANT_STATUS_${status}`,
       entity: 'Restaurant',
       entityId: restaurant._id,
-      details: `Status updated to ${status} by Super Admin`
+      details: `Super Admin set restaurant status to ${status}`
     });
 
     res.status(200).json({
@@ -181,7 +268,7 @@ exports.updateRestaurantStatus = async (req, res, next) => {
   }
 };
 
-// @desc    Update Subscription Plan (FREE, BASIC, PRO, PREMIUM)
+// @desc    Update Subscription Plan
 // @route   PATCH /api/platform/restaurants/:id/plan
 // @access  Private (Super Admin)
 exports.updateRestaurantPlan = async (req, res, next) => {
@@ -201,11 +288,506 @@ exports.updateRestaurantPlan = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
 
+    await AuditLog.create({
+      restaurant: restaurant._id,
+      user: req.user._id,
+      userName: req.user.name,
+      userRole: req.user.role,
+      action: 'RESTAURANT_PLAN_UPDATED',
+      entity: 'Restaurant',
+      entityId: restaurant._id,
+      details: `Plan set to ${plan || restaurant.plan}`
+    });
+
     res.status(200).json({
       success: true,
       message: 'Subscription plan updated successfully',
       restaurant
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Securely Reset Restaurant Admin Password
+// @route   POST /api/platform/restaurants/:id/reset-password
+// @access  Private (Super Admin)
+exports.resetRestaurantPassword = async (req, res, next) => {
+  try {
+    const restaurant = await Restaurant.findById(req.params.id).populate('owner');
+    if (!restaurant || !restaurant.owner) {
+      return res.status(404).json({ success: false, message: 'Restaurant or owner account not found' });
+    }
+
+    // Generate random 10-character temporary password
+    const tempPassword = `Temp@${crypto.randomBytes(3).toString('hex')}`;
+    
+    // Update user password
+    const ownerUser = await User.findById(restaurant.owner._id);
+    ownerUser.password = tempPassword;
+    await ownerUser.save();
+
+    // Log action to AuditLog without storing plaintext password
+    await AuditLog.create({
+      restaurant: restaurant._id,
+      user: req.user._id,
+      userName: req.user.name,
+      userRole: req.user.role,
+      action: 'ADMIN_PASSWORD_RESET',
+      entity: 'User',
+      entityId: ownerUser._id,
+      details: `Super Admin generated a temporary password for owner ${ownerUser.email}`
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Temporary admin password generated successfully',
+      tempCredentials: {
+        email: ownerUser.email,
+        tempPassword,
+        restaurantName: restaurant.name,
+        expiresNotice: 'Displayed securely in this single one-time payload.'
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get Tenant Control Data Bundle (Control Mode Workspace)
+// @route   GET /api/platform/restaurants/:id/control-data
+// @access  Private (Super Admin)
+exports.getTenantControlData = async (req, res, next) => {
+  try {
+    const restaurant = await Restaurant.findById(req.params.id).populate('owner', 'name email mobile role createdAt');
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    const [totalOrders, totalMenuItems, totalTables, totalStaff] = await Promise.all([
+      Order.countDocuments({ restaurant: restaurant._id }),
+      MenuItem.countDocuments({ restaurant: restaurant._id }),
+      Table.countDocuments({ restaurant: restaurant._id }),
+      User.countDocuments({ restaurant: restaurant._id })
+    ]);
+
+    const activeOrders = await Order.countDocuments({
+      restaurant: restaurant._id,
+      orderStatus: { $in: ['New', 'Accepted', 'Preparing', 'Ready'] }
+    });
+
+    const revAgg = await Order.aggregate([
+      { $match: { restaurant: restaurant._id } },
+      { $group: { _id: null, total: { $sum: '$grandTotal' } } }
+    ]);
+
+    const recentOrders = await Order.find({ restaurant: restaurant._id })
+      .populate('table', 'tableNumber section')
+      .sort('-createdAt')
+      .limit(10);
+
+    const categories = await Category.find({ restaurant: restaurant._id }).sort('displayOrder');
+    const menuItems = await MenuItem.find({ restaurant: restaurant._id }).sort('name');
+    const tables = await Table.find({ restaurant: restaurant._id }).sort('tableNumber');
+    const staffList = await User.find({ restaurant: restaurant._id }).select('-password');
+
+    res.status(200).json({
+      success: true,
+      restaurant,
+      metrics: {
+        totalOrders,
+        activeOrders,
+        totalRevenue: Math.round(revAgg[0]?.total || 0),
+        totalMenuItems,
+        totalTables,
+        totalStaff
+      },
+      categories,
+      menuItems,
+      tables,
+      staffList,
+      recentOrders
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get Tenant Users
+// @route   GET /api/platform/restaurants/:id/users
+// @access  Private (Super Admin)
+exports.getTenantUsers = async (req, res, next) => {
+  try {
+    const users = await User.find({ restaurant: req.params.id }).select('-password').sort('-createdAt');
+    res.status(200).json({ success: true, count: users.length, users });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Create Tenant User
+// @route   POST /api/platform/restaurants/:id/users
+// @access  Private (Super Admin)
+exports.createTenantUser = async (req, res, next) => {
+  try {
+    const { name, email, password, role, mobile } = req.body;
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Email address already registered' });
+    }
+
+    const newUser = await User.create({
+      name,
+      email,
+      password: password || 'Staff@123',
+      role: role || 'manager',
+      mobile,
+      restaurant: req.params.id
+    });
+
+    await AuditLog.create({
+      restaurant: req.params.id,
+      user: req.user._id,
+      userName: req.user.name,
+      userRole: req.user.role,
+      action: 'TENANT_USER_CREATED',
+      entity: 'User',
+      entityId: newUser._id,
+      details: `Created user ${email} with role ${role}`
+    });
+
+    res.status(201).json({ success: true, user: newUser });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Update Tenant User
+// @route   PATCH /api/platform/restaurants/:id/users/:userId
+// @access  Private (Super Admin)
+exports.updateTenantUser = async (req, res, next) => {
+  try {
+    const { name, role, isActive, permissions } = req.body;
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (role) updateData.role = role;
+    if (typeof isActive === 'boolean') updateData.isActive = isActive;
+    if (permissions) updateData.permissions = permissions;
+
+    const user = await User.findOneAndUpdate(
+      { _id: req.params.userId, restaurant: req.params.id },
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Staff user not found for this tenant' });
+    }
+
+    res.status(200).json({ success: true, user });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Delete/Deactivate Tenant User
+// @route   DELETE /api/platform/restaurants/:id/users/:userId
+// @access  Private (Super Admin)
+exports.deleteTenantUser = async (req, res, next) => {
+  try {
+    const user = await User.findOneAndDelete({ _id: req.params.userId, restaurant: req.params.id });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Staff user not found' });
+    }
+
+    await AuditLog.create({
+      restaurant: req.params.id,
+      user: req.user._id,
+      userName: req.user.name,
+      userRole: req.user.role,
+      action: 'TENANT_USER_DELETED',
+      entity: 'User',
+      entityId: req.params.userId,
+      details: `Super Admin deleted user ${user.email}`
+    });
+
+    res.status(200).json({ success: true, message: 'Staff user removed successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get Tenant Menu & Categories
+// @route   GET /api/platform/restaurants/:id/menu
+// @access  Private (Super Admin)
+exports.getTenantMenu = async (req, res, next) => {
+  try {
+    const categories = await Category.find({ restaurant: req.params.id }).sort('displayOrder');
+    const items = await MenuItem.find({ restaurant: req.params.id }).sort('name');
+    res.status(200).json({ success: true, categories, items });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get Tenant Tables & QR Codes
+// @route   GET /api/platform/restaurants/:id/tables
+// @access  Private (Super Admin)
+exports.getTenantTables = async (req, res, next) => {
+  try {
+    const tables = await Table.find({ restaurant: req.params.id }).sort('tableNumber');
+    const qrCodes = await QRCode.find({ restaurant: req.params.id });
+    res.status(200).json({ success: true, tables, qrCodes });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Regenerate Table QR Token
+// @route   POST /api/platform/restaurants/:id/tables/:tableId/regenerate-qr
+// @access  Private (Super Admin)
+exports.regenerateTableQR = async (req, res, next) => {
+  try {
+    const table = await Table.findOne({ _id: req.params.tableId, restaurant: req.params.id });
+    if (!table) {
+      return res.status(404).json({ success: false, message: 'Table not found' });
+    }
+
+    const newToken = generateTableToken();
+    const qrDataUrl = await generateQRCodeDataUrl(req.params.id, table._id, newToken);
+
+    table.qrToken = newToken;
+    table.qrCodeImage = qrDataUrl;
+    await table.save();
+
+    await AuditLog.create({
+      restaurant: req.params.id,
+      user: req.user._id,
+      userName: req.user.name,
+      userRole: req.user.role,
+      action: 'QR_REGENERATED',
+      entity: 'Table',
+      entityId: table._id,
+      details: `Regenerated QR code token for Table #${table.tableNumber}`
+    });
+
+    res.status(200).json({ success: true, table, qrCodeImage: qrDataUrl });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get Tenant Orders
+// @route   GET /api/platform/restaurants/:id/orders
+// @access  Private (Super Admin)
+exports.getTenantOrders = async (req, res, next) => {
+  try {
+    const { status } = req.query;
+    const query = { restaurant: req.params.id };
+    if (status && status !== 'ALL') query.orderStatus = status;
+
+    const orders = await Order.find(query)
+      .populate('table', 'tableNumber section')
+      .sort('-createdAt')
+      .limit(100);
+
+    res.status(200).json({ success: true, count: orders.length, orders });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get Tenant Reports
+// @route   GET /api/platform/restaurants/:id/reports
+// @access  Private (Super Admin)
+exports.getTenantReports = async (req, res, next) => {
+  try {
+    const restaurantId = req.params.id;
+
+    const totalAgg = await Order.aggregate([
+      { $match: { restaurant: new (require('mongoose').Types.ObjectId)(restaurantId) } },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: '$grandTotal' },
+          totalOrders: { $sum: 1 },
+          totalSubtotal: { $sum: '$subtotal' },
+          totalTax: { $sum: '$tax' }
+        }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      report: {
+        totalRevenue: Math.round(totalAgg[0]?.totalRevenue || 0),
+        totalOrders: totalAgg[0]?.totalOrders || 0,
+        totalSubtotal: Math.round(totalAgg[0]?.totalSubtotal || 0),
+        totalTax: Math.round(totalAgg[0]?.totalTax || 0)
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get Global Platform Users
+// @route   GET /api/platform/users
+// @access  Private (Super Admin)
+exports.getGlobalUsers = async (req, res, next) => {
+  try {
+    const { search, role } = req.query;
+    const query = {};
+    if (role && role !== 'ALL') query.role = role;
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const users = await User.find(query)
+      .populate('restaurant', 'name restaurantCode logo')
+      .select('-password')
+      .sort('-createdAt')
+      .limit(150);
+
+    res.status(200).json({ success: true, count: users.length, users });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get Global Platform Orders
+// @route   GET /api/platform/orders
+// @access  Private (Super Admin)
+exports.getGlobalOrders = async (req, res, next) => {
+  try {
+    const { status, search } = req.query;
+    const query = {};
+    if (status && status !== 'ALL') query.orderStatus = status;
+
+    const orders = await Order.find(query)
+      .populate('restaurant', 'name restaurantCode logo')
+      .populate('table', 'tableNumber section')
+      .sort('-createdAt')
+      .limit(150);
+
+    res.status(200).json({ success: true, count: orders.length, orders });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get Global Platform Revenue Reports
+// @route   GET /api/platform/reports
+// @access  Private (Super Admin)
+exports.getGlobalReports = async (req, res, next) => {
+  try {
+    const topRestaurants = await Order.aggregate([
+      {
+        $group: {
+          _id: '$restaurant',
+          totalRevenue: { $sum: '$grandTotal' },
+          totalOrders: { $sum: 1 }
+        }
+      },
+      { $sort: { totalRevenue: -1 } },
+      { $limit: 10 },
+      {
+        $lookup: {
+          from: 'restaurants',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'restaurant'
+        }
+      },
+      { $unwind: '$restaurant' }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      topRestaurants: topRestaurants.map(item => ({
+        _id: item._id,
+        name: item.restaurant.name,
+        code: item.restaurant.restaurantCode,
+        logo: item.restaurant.logo,
+        totalRevenue: Math.round(item.totalRevenue),
+        totalOrders: item.totalOrders
+      }))
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get Operational Location Monitor Data
+// @route   GET /api/platform/location-monitor
+// @access  Private (Super Admin)
+exports.getLocationMonitorData = async (req, res, next) => {
+  try {
+    const restaurants = await Restaurant.find().select('name restaurantCode logo address phone status isAcceptingOrders plan createdAt');
+
+    const locations = restaurants.map((r, idx) => ({
+      _id: r._id,
+      code: r.restaurantCode || `REST-${String(idx + 1).padStart(5, '0')}`,
+      name: r.name,
+      logo: r.logo,
+      status: r.status,
+      isOnline: r.isAcceptingOrders,
+      address: `${r.address?.street || ''}, ${r.address?.city || 'Bengaluru'}, ${r.address?.state || 'Karnataka'}`,
+      city: r.address?.city || 'Bengaluru',
+      state: r.address?.state || 'Karnataka',
+      country: r.address?.country || 'India',
+      lat: r.address?.lat || (12.9716 + (idx * 0.02)),
+      lng: r.address?.lng || (77.5946 + (idx * 0.02)),
+      phone: r.phone
+    }));
+
+    res.status(200).json({ success: true, count: locations.length, locations });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Record Administrative Click Log Event
+// @route   POST /api/platform/click-log
+// @access  Private (Super Admin)
+exports.recordClickLog = async (req, res, next) => {
+  try {
+    const { action, page, entity, entityId, restaurantId, metadata } = req.body;
+
+    const log = await ClickLog.create({
+      user: req.user._id,
+      userName: req.user.name,
+      userRole: req.user.role,
+      restaurant: restaurantId || null,
+      action,
+      page,
+      entity,
+      entityId,
+      metadata,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    });
+
+    res.status(201).json({ success: true, log });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Get Click Logs
+// @route   GET /api/platform/click-logs
+// @access  Private (Super Admin)
+exports.getClickLogs = async (req, res, next) => {
+  try {
+    const logs = await ClickLog.find()
+      .populate('restaurant', 'name restaurantCode')
+      .sort('-createdAt')
+      .limit(100);
+
+    res.status(200).json({ success: true, count: logs.length, logs });
   } catch (err) {
     next(err);
   }
