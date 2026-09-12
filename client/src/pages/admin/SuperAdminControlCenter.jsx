@@ -33,6 +33,8 @@ import PasswordResetModal from '../../components/superadmin/PasswordResetModal';
 import LocationMonitor from '../../components/superadmin/LocationMonitor';
 import ClickLoggerView from '../../components/superadmin/ClickLoggerView';
 import AuditLoggerView from '../../components/superadmin/AuditLoggerView';
+import RegisterRestaurantModal from '../../components/superadmin/RegisterRestaurantModal';
+import EditCredentialsModal from '../../components/superadmin/EditCredentialsModal';
 
 export default function SuperAdminControlCenter() {
   const [treeData, setTreeData] = useState([]);
@@ -45,13 +47,17 @@ export default function SuperAdminControlCenter() {
   const [controlData, setControlData] = useState(null);
   const [controlLoading, setControlLoading] = useState(false);
 
-  // Password Reset Modal State
+  // Modal States
   const [resetModalRestaurant, setResetModalRestaurant] = useState(null);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [editCredentialsTarget, setEditCredentialsTarget] = useState(null);
+  const [editCredentialsType, setEditCredentialsType] = useState('owner');
 
   // Global filters
   const [globalSearch, setGlobalSearch] = useState('');
   const [globalStatusFilter, setGlobalStatusFilter] = useState('ALL');
   const [globalPlanFilter, setGlobalPlanFilter] = useState('ALL');
+
 
   // Fetch Tree & Global Platform Stats
   const fetchPlatformData = useCallback(async () => {
@@ -159,6 +165,10 @@ export default function SuperAdminControlCenter() {
         activeRestaurant={activeRestaurant}
         onEnterControlMode={handleEnterControlMode}
         onResetPassword={(rest) => setResetModalRestaurant(rest)}
+        onEditCredentials={(targetObj, type) => {
+          setEditCredentialsTarget(targetObj);
+          setEditCredentialsType(type || 'owner');
+        }}
         onStatusChange={handleStatusChange}
       />
 
@@ -268,7 +278,26 @@ export default function SuperAdminControlCenter() {
                       </div>
                     </div>
 
-                    <div className="pt-4 border-t border-slate-800 space-y-3">
+                    <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center gap-3">
+                      <button
+                        onClick={() => {
+                          const owner = controlData.restaurant.owner || {};
+                          setEditCredentialsTarget({
+                            _id: owner._id || controlData.restaurant._id,
+                            restaurantId: controlData.restaurant._id,
+                            name: owner.name || controlData.restaurant.name,
+                            email: owner.email || controlData.restaurant.email,
+                            mobile: owner.mobile || controlData.restaurant.phone,
+                            role: 'owner'
+                          });
+                          setEditCredentialsType('owner');
+                        }}
+                        className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-xs font-bold transition flex items-center gap-2 shadow-lg shadow-orange-500/20"
+                      >
+                        <Key className="w-4 h-4" />
+                        <span>Edit Owner Credentials / Password</span>
+                      </button>
+
                       <button
                         onClick={() => setResetModalRestaurant(controlData.restaurant)}
                         className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition flex items-center gap-2"
@@ -283,17 +312,35 @@ export default function SuperAdminControlCenter() {
                 {/* 3. Tenant Users */}
                 {activeTab === 'users' && (
                   <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-                    <h2 className="text-lg font-black text-white">Tenant Staff Users ({controlData.staffList?.length})</h2>
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-lg font-black text-white">Tenant Staff Users ({controlData.staffList?.length})</h2>
+                    </div>
                     <div className="divide-y divide-slate-800 text-xs">
                       {controlData.staffList?.map(staff => (
-                        <div key={staff._id} className="py-3 flex items-center justify-between">
+                        <div key={staff._id} className="py-3 flex items-center justify-between gap-4">
                           <div>
-                            <div className="font-bold text-white">{staff.name}</div>
+                            <div className="font-bold text-white flex items-center gap-2">
+                              <span>{staff.name}</span>
+                              <span className="text-[10px] font-mono text-slate-500 font-normal">(ID: {staff._id})</span>
+                            </div>
                             <div className="text-slate-400 text-[11px]">{staff.email} • {staff.mobile || 'No mobile'}</div>
                           </div>
-                          <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-slate-800 text-purple-300">
-                            {staff.role}
-                          </span>
+                          
+                          <div className="flex items-center gap-3">
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-slate-800 text-purple-300">
+                              {staff.role}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setEditCredentialsTarget(staff);
+                                setEditCredentialsType('staff');
+                              }}
+                              className="px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs font-bold transition flex items-center gap-1.5"
+                            >
+                              <Key className="w-3.5 h-3.5" />
+                              <span>Edit ID / Password</span>
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -366,13 +413,23 @@ export default function SuperAdminControlCenter() {
                       <p className="text-xs text-slate-400">Centralized control center for all multi-tenant restaurant workspaces.</p>
                     </div>
 
-                    <button
-                      onClick={fetchPlatformData}
-                      className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-200 transition flex items-center gap-2"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5 text-purple-400" />
-                      <span>Refresh Global Platform</span>
-                    </button>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setIsRegisterModalOpen(true)}
+                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-brand-500 to-purple-600 hover:from-brand-600 hover:to-purple-700 text-white text-xs font-bold shadow-lg shadow-brand-500/25 transition flex items-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Register New Restaurant</span>
+                      </button>
+
+                      <button
+                        onClick={fetchPlatformData}
+                        className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-200 transition flex items-center gap-2"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Refresh</span>
+                      </button>
+                    </div>
                   </div>
 
                   {stats && (
@@ -430,6 +487,14 @@ export default function SuperAdminControlCenter() {
                 <div className="p-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-black text-white">All Platform Restaurants</h2>
+                    
+                    <button
+                      onClick={() => setIsRegisterModalOpen(true)}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-brand-500 to-purple-600 hover:from-brand-600 hover:to-purple-700 text-white text-xs font-bold shadow-lg shadow-brand-500/25 transition flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Register New Restaurant</span>
+                    </button>
                   </div>
 
                   <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -503,7 +568,25 @@ export default function SuperAdminControlCenter() {
                               <td className="px-5 py-3.5 font-bold text-brand-400">{rest.plan}</td>
                               <td className="px-5 py-3.5">{rest.metrics.ordersCount}</td>
                               <td className="px-5 py-3.5 text-emerald-400 font-bold">₹{rest.metrics.revenue?.toLocaleString()}</td>
-                              <td className="px-5 py-3.5 text-right">
+                              <td className="px-5 py-3.5 text-right flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditCredentialsTarget({
+                                      _id: rest._id,
+                                      restaurantId: rest._id,
+                                      name: rest.ownerName,
+                                      email: rest.email,
+                                      mobile: rest.phone,
+                                      role: 'owner'
+                                    });
+                                    setEditCredentialsType('owner');
+                                  }}
+                                  className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-xs font-bold transition flex items-center gap-1"
+                                >
+                                  <Key className="w-3.5 h-3.5" />
+                                  <span>Edit Credentials</span>
+                                </button>
+
                                 <button
                                   onClick={() => handleEnterControlMode(rest, 'dashboard')}
                                   className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs"
@@ -556,6 +639,30 @@ export default function SuperAdminControlCenter() {
           onClose={() => setResetModalRestaurant(null)}
         />
       )}
+
+      {/* Register New Restaurant Modal */}
+      <RegisterRestaurantModal
+        isOpen={isRegisterModalOpen}
+        onClose={() => setIsRegisterModalOpen(false)}
+        onSuccess={() => {
+          fetchPlatformData();
+        }}
+      />
+
+      {/* Edit Credentials Modal */}
+      <EditCredentialsModal
+        isOpen={!!editCredentialsTarget}
+        target={editCredentialsTarget}
+        type={editCredentialsType}
+        onClose={() => setEditCredentialsTarget(null)}
+        onSuccess={() => {
+          fetchPlatformData();
+          if (activeRestaurant) {
+            handleEnterControlMode(activeRestaurant, activeTab);
+          }
+        }}
+      />
     </div>
   );
 }
+

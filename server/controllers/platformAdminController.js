@@ -812,3 +812,204 @@ exports.getAuditLogs = async (req, res, next) => {
     next(err);
   }
 };
+
+// @desc    Register New Restaurant by Super Admin
+// @route   POST /api/platform/restaurants
+// @access  Private (Super Admin)
+exports.registerNewRestaurantByAdmin = async (req, res, next) => {
+  try {
+    const {
+      name,
+      email,
+      phone,
+      ownerName,
+      ownerEmail,
+      ownerPassword,
+      ownerMobile,
+      plan,
+      street,
+      city,
+      state,
+      pincode
+    } = req.body;
+
+    const existingUser = await User.findOne({ email: ownerEmail || email });
+    if (existingUser) {
+      return res.status(400).json({ success: false, message: 'Owner/User email already registered' });
+    }
+
+    const restaurantCode = `REST-${Math.floor(10000 + Math.random() * 90000)}`;
+
+    const restaurant = new Restaurant({
+      name,
+      email: email || ownerEmail,
+      phone: phone || ownerMobile,
+      restaurantCode,
+      status: 'APPROVED',
+      plan: plan || 'PRO',
+      subscriptionStatus: 'ACTIVE',
+      address: {
+        street: street || '',
+        city: city || 'Bengaluru',
+        state: state || 'Karnataka',
+        pincode: pincode || '560001',
+        country: 'India'
+      }
+    });
+
+    const ownerUser = new User({
+      name: ownerName || `Owner - ${name}`,
+      email: ownerEmail || email,
+      password: ownerPassword || 'Owner@123',
+      role: 'admin',
+      mobile: ownerMobile || phone,
+      restaurant: restaurant._id
+    });
+
+    await ownerUser.save();
+    restaurant.owner = ownerUser._id;
+    await restaurant.save();
+
+    await AuditLog.create({
+      restaurant: restaurant._id,
+      user: req.user._id,
+      userName: req.user.name,
+      userRole: req.user.role,
+      action: 'RESTAURANT_REGISTERED_BY_ADMIN',
+      entity: 'Restaurant',
+      entityId: restaurant._id,
+      details: `Super Admin registered new restaurant ${name} (${restaurantCode})`
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Restaurant registered successfully!',
+      restaurant,
+      owner: {
+        _id: ownerUser._id,
+        name: ownerUser.name,
+        email: ownerUser.email,
+        role: ownerUser.role
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Update Restaurant Owner Credentials
+// @route   PUT /api/platform/restaurants/:id/credentials
+// @access  Private (Super Admin)
+exports.updateOwnerCredentials = async (req, res, next) => {
+  try {
+    const { email, password, name, mobile } = req.body;
+
+    const restaurant = await Restaurant.findById(req.params.id);
+    if (!restaurant) {
+      return res.status(404).json({ success: false, message: 'Restaurant not found' });
+    }
+
+    let ownerUser = null;
+    if (restaurant.owner) {
+      ownerUser = await User.findById(restaurant.owner);
+    } else {
+      ownerUser = await User.findOne({ restaurant: restaurant._id, role: 'admin' });
+    }
+
+    if (!ownerUser) {
+      return res.status(404).json({ success: false, message: 'Owner user account not found for this restaurant' });
+    }
+
+    if (email && email.toLowerCase() !== ownerUser.email.toLowerCase()) {
+      const emailExists = await User.findOne({ email: email.toLowerCase(), _id: { $ne: ownerUser._id } });
+      if (emailExists) {
+        return res.status(400).json({ success: false, message: 'Email is already in use by another user' });
+      }
+      ownerUser.email = email.toLowerCase();
+      restaurant.email = email.toLowerCase();
+    }
+
+    if (name) ownerUser.name = name;
+    if (mobile) ownerUser.mobile = mobile;
+    if (password && password.trim().length > 0) {
+      ownerUser.password = password; // pre-save hook in User.js will hash this
+    }
+
+    await ownerUser.save();
+    await restaurant.save();
+
+    await AuditLog.create({
+      restaurant: restaurant._id,
+      user: req.user._id,
+      userName: req.user.name,
+      userRole: req.user.role,
+      action: 'OWNER_CREDENTIALS_UPDATED',
+      entity: 'User',
+      entityId: ownerUser._id,
+      details: `Super Admin updated credentials for owner (${ownerUser.email})`
+    });
+
+    const updatedUser = await User.findById(ownerUser._id).select('-password');
+
+    res.status(200).json({
+      success: true,
+      message: 'Owner credentials updated successfully',
+      user: updatedUser
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Update Staff Credentials (ID, Email, Password, Role)
+// @route   PUT /api/platform/users/:id/credentials
+// @access  Private (Super Admin)
+exports.updateStaffCredentials = async (req, res, next) => {
+  try {
+    const { email, password, name, mobile, role } = req.body;
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (email && email.toLowerCase() !== user.email.toLowerCase()) {
+      const emailExists = await User.findOne({ email: email.toLowerCase(), _id: { $ne: user._id } });
+      if (emailExists) {
+        return res.status(400).json({ success: false, message: 'Email is already in use by another user' });
+      }
+      user.email = email.toLowerCase();
+    }
+
+    if (name) user.name = name;
+    if (mobile) user.mobile = mobile;
+    if (role) user.role = role;
+    if (password && password.trim().length > 0) {
+      user.password = password; // pre-save hook hashes it
+    }
+
+    await user.save();
+
+    await AuditLog.create({
+      restaurant: user.restaurant || null,
+      user: req.user._id,
+      userName: req.user.name,
+      userRole: req.user.role,
+      action: 'STAFF_CREDENTIALS_UPDATED',
+      entity: 'User',
+      entityId: user._id,
+      details: `Super Admin updated credentials for staff user (${user.email})`
+    });
+
+    const updatedUser = await User.findById(user._id).select('-password');
+
+    res.status(200).json({
+      success: true,
+      message: 'Staff credentials updated successfully',
+      user: updatedUser
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+

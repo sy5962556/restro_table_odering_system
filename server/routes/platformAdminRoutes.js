@@ -6,9 +6,12 @@ const {
   getRestaurantTree,
   getAllRestaurants,
   getRestaurantDetails,
+  registerNewRestaurantByAdmin,
   updateRestaurantStatus,
   updateRestaurantPlan,
   resetRestaurantPassword,
+  updateOwnerCredentials,
+  updateStaffCredentials,
   getTenantControlData,
   getTenantUsers,
   createTenantUser,
@@ -36,12 +39,15 @@ router.use(authorize('superadmin'));
 router.get('/dashboard', getPlatformDashboard);
 router.get('/tree', getRestaurantTree);
 
-// Restaurants & Control Mode
+// Restaurants & Direct Management
 router.get('/restaurants', getAllRestaurants);
+router.post('/restaurants', registerNewRestaurantByAdmin);
 router.get('/restaurants/:id', getRestaurantDetails);
 router.patch('/restaurants/:id/status', updateRestaurantStatus);
 router.patch('/restaurants/:id/plan', updateRestaurantPlan);
 router.post('/restaurants/:id/reset-password', resetRestaurantPassword);
+router.put('/restaurants/:id/credentials', updateOwnerCredentials);
+router.put('/users/:id/credentials', updateStaffCredentials);
 router.get('/restaurants/:id/control-data', getTenantControlData);
 
 // Tenant-Scoped Management (Control Mode)

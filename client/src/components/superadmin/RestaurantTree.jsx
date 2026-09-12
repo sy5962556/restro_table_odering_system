@@ -36,6 +36,7 @@ export default function RestaurantTree({
   activeRestaurant, 
   onEnterControlMode, 
   onResetPassword, 
+  onEditCredentials,
   onStatusChange 
 }) {
   const [platformExpanded, setPlatformExpanded] = useState(true);
@@ -251,7 +252,7 @@ export default function RestaurantTree({
                           {menuOpenId === rest._id && (
                             <div 
                               onClick={(e) => e.stopPropagation()}
-                              className="absolute right-0 top-6 z-50 w-48 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1 text-[11px] space-y-0.5 font-semibold text-slate-200"
+                              className="absolute right-0 top-6 z-50 w-52 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1 text-[11px] space-y-0.5 font-semibold text-slate-200"
                             >
                               <button
                                 onClick={() => {
@@ -261,7 +262,25 @@ export default function RestaurantTree({
                                 className="w-full px-3 py-1.5 hover:bg-purple-600 hover:text-white text-left flex items-center gap-2"
                               >
                                 <ExternalLink className="w-3.5 h-3.5 text-purple-400" />
-                                <span>Manage Restaurant (Control)</span>
+                                <span>Manage Workspace</span>
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  setMenuOpenId(null);
+                                  onEditCredentials && onEditCredentials({
+                                    _id: rest._id,
+                                    restaurantId: rest._id,
+                                    name: rest.ownerName,
+                                    email: rest.email,
+                                    mobile: rest.phone,
+                                    role: 'owner'
+                                  }, 'owner');
+                                }}
+                                className="w-full px-3 py-1.5 hover:bg-amber-600 hover:text-white text-left flex items-center gap-2 text-amber-300"
+                              >
+                                <Key className="w-3.5 h-3.5 text-amber-400" />
+                                <span>Edit Owner Credentials</span>
                               </button>
 
                               <button
@@ -269,11 +288,12 @@ export default function RestaurantTree({
                                   setMenuOpenId(null);
                                   onResetPassword(rest);
                                 }}
-                                className="w-full px-3 py-1.5 hover:bg-slate-800 text-left flex items-center gap-2 text-amber-300"
+                                className="w-full px-3 py-1.5 hover:bg-slate-800 text-left flex items-center gap-2 text-slate-300"
                               >
-                                <Key className="w-3.5 h-3.5 text-amber-400" />
+                                <Key className="w-3.5 h-3.5 text-slate-400" />
                                 <span>Reset Admin Password</span>
                               </button>
+
 
                               {rest.status === 'APPROVED' ? (
                                 <button
