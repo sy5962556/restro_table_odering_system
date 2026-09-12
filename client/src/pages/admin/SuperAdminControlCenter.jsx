@@ -35,6 +35,7 @@ import ClickLoggerView from '../../components/superadmin/ClickLoggerView';
 import AuditLoggerView from '../../components/superadmin/AuditLoggerView';
 import RegisterRestaurantModal from '../../components/superadmin/RegisterRestaurantModal';
 import EditCredentialsModal from '../../components/superadmin/EditCredentialsModal';
+import AdminMasterControlView from '../../components/superadmin/AdminMasterControlView';
 
 export default function SuperAdminControlCenter() {
   const [treeData, setTreeData] = useState([]);
@@ -399,87 +400,21 @@ export default function SuperAdminControlCenter() {
             /* B. GLOBAL SUPER ADMIN PLATFORM WORKSPACE                 */
             /* ──────────────────────────────────────────────────────── */
             <div>
-              {/* 1. Global Dashboard */}
+              {/* 1. Global Dashboard — Admin Master Control */}
               {activeTab === 'global-dashboard' && (
-                <div className="p-6 space-y-6">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                          👑 SUPER ADMIN COMMAND CENTER
-                        </span>
-                      </div>
-                      <h1 className="text-3xl font-black text-white mt-1.5">Platform Administration</h1>
-                      <p className="text-xs text-slate-400">Centralized control center for all multi-tenant restaurant workspaces.</p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setIsRegisterModalOpen(true)}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-brand-500 to-purple-600 hover:from-brand-600 hover:to-purple-700 text-white text-xs font-bold shadow-lg shadow-brand-500/25 transition flex items-center gap-2"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Register New Restaurant</span>
-                      </button>
-
-                      <button
-                        onClick={fetchPlatformData}
-                        className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-200 transition flex items-center gap-2"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5 text-purple-400" />
-                        <span>Refresh</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {stats && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800">
-                        <span className="text-xs text-slate-400">Total Restaurants</span>
-                        <div className="text-3xl font-black text-white mt-1">{stats.totalRestaurants}</div>
-                        <div className="text-[11px] text-slate-500 mt-2 flex gap-3">
-                          <span className="text-emerald-400">✓ {stats.approvedRestaurants} Active</span>
-                          <span className="text-amber-400">⏳ {stats.pendingRestaurants} Pending</span>
-                          <span className="text-rose-400">🚫 {stats.suspendedRestaurants} Suspended</span>
-                        </div>
-                      </div>
-
-                      <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800">
-                        <span className="text-xs text-slate-400">Global Platform Revenue</span>
-                        <div className="text-3xl font-black text-emerald-400 mt-1">₹{stats.totalRevenue?.toLocaleString()}</div>
-                        <div className="text-[11px] text-slate-500 mt-2">Aggregated customer sales</div>
-                      </div>
-
-                      <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800">
-                        <span className="text-xs text-slate-400">Global Table Orders</span>
-                        <div className="text-3xl font-black text-brand-400 mt-1">{stats.totalOrders}</div>
-                        <div className="text-[11px] text-slate-500 mt-2">Live QR orders placed</div>
-                      </div>
-
-                      <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800">
-                        <span className="text-xs text-slate-400">Total Registered Users</span>
-                        <div className="text-3xl font-black text-purple-400 mt-1">{stats.totalUsers}</div>
-                        <div className="text-[11px] text-slate-500 mt-2">Platform user accounts</div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Recent Platform Activity */}
-                  <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
-                    <h3 className="font-extrabold text-sm text-white">Recent Security Audit Logs</h3>
-                    <div className="divide-y divide-slate-800 text-xs">
-                      {stats?.recentAuditLogs?.map(log => (
-                        <div key={log._id} className="py-2.5 flex items-center justify-between font-mono">
-                          <div>
-                            <span className="font-bold text-white">{log.userName}</span>
-                            <span className="text-purple-400 ml-2 font-bold">{log.action}</span>
-                          </div>
-                          <span className="text-slate-500 text-[11px]">{new Date(log.createdAt).toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                <AdminMasterControlView
+                  treeData={treeData}
+                  stats={stats}
+                  loading={loading}
+                  onRefresh={fetchPlatformData}
+                  onRegister={() => setIsRegisterModalOpen(true)}
+                  onEnterControlMode={handleEnterControlMode}
+                  onEditCredentials={(targetObj, type) => {
+                    setEditCredentialsTarget(targetObj);
+                    setEditCredentialsType(type || 'owner');
+                  }}
+                  onResetPassword={(rest) => setResetModalRestaurant(rest)}
+                />
               )}
 
               {/* 2. Global Restaurants List */}
