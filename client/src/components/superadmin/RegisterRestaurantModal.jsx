@@ -33,7 +33,11 @@ export const RegisterRestaurantModal = ({ isOpen, onClose, onSuccess }) => {
     setSuccessMsg('');
 
     try {
-      const res = await api.post('/platform/restaurants', formData);
+      const payload = {
+        ...formData,
+        email: formData.email || formData.ownerEmail
+      };
+      const res = await api.post('/platform/restaurants', payload);
       if (res.data.success) {
         setSuccessMsg(`Restaurant "${res.data.restaurant.name}" registered successfully! Code: ${res.data.restaurant.restaurantCode}`);
         setTimeout(() => {
@@ -123,23 +127,6 @@ export const RegisterRestaurantModal = ({ isOpen, onClose, onSuccess }) => {
                   <option value="PRO">PRO (Standard)</option>
                   <option value="ENTERPRISE">ENTERPRISE (Full Suite)</option>
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Official Email
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="contact@royalspice.com"
-                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800 text-xs font-semibold text-slate-900 dark:text-white focus:ring-2 focus:ring-brand-500"
-                  />
-                </div>
               </div>
 
               <div>

@@ -25,10 +25,6 @@ export default function SuperAdminControlCenter() {
   const [editCredentialsTarget, setEditCredentialsTarget] = useState(null);
   const [editCredentialsType, setEditCredentialsType] = useState('owner');
 
-  // Global filters (kept for compatibility)
-  const [globalSearch, setGlobalSearch] = useState('');
-  const [globalStatusFilter, setGlobalStatusFilter] = useState('ALL');
-  const [globalPlanFilter, setGlobalPlanFilter] = useState('ALL');
 
   // ── Fetch Platform Data ──────────────────────────────────────────────────────
   const fetchPlatformData = useCallback(async () => {

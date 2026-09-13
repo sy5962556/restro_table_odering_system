@@ -269,10 +269,9 @@ export default function AdminMasterControlView({
                 {/* Table Head */}
                 <thead>
                   <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60">
-                    <th className="px-5 py-3.5 font-extrabold text-[10px] uppercase tracking-wider text-slate-400 w-56">Business Name</th>
+                    <th className="px-5 py-3.5 font-extrabold text-[10px] uppercase tracking-wider text-slate-400 w-64">Business Name</th>
                     <th className="px-4 py-3.5 font-extrabold text-[10px] uppercase tracking-wider text-slate-400">Type</th>
                     <th className="px-4 py-3.5 font-extrabold text-[10px] uppercase tracking-wider text-slate-400">Contact</th>
-                    <th className="px-4 py-3.5 font-extrabold text-[10px] uppercase tracking-wider text-slate-400">Role</th>
                     <th className="px-4 py-3.5 font-extrabold text-[10px] uppercase tracking-wider text-slate-400">Status & Expiry</th>
                     <th className="px-4 py-3.5 font-extrabold text-[10px] uppercase tracking-wider text-slate-400 text-right">Actions</th>
                   </tr>
@@ -287,14 +286,13 @@ export default function AdminMasterControlView({
                         <td className="px-5 py-4"><div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-36 mb-1.5" /><div className="h-2 bg-slate-100 dark:bg-slate-700 rounded w-20" /></td>
                         <td className="px-4 py-4"><div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-full w-20" /></td>
                         <td className="px-4 py-4"><div className="h-2.5 bg-slate-200 dark:bg-slate-800 rounded w-32 mb-1.5" /><div className="h-2 bg-slate-100 dark:bg-slate-700 rounded w-24" /></td>
-                        <td className="px-4 py-4"><div className="h-5 bg-slate-200 dark:bg-slate-800 rounded-full w-14" /></td>
                         <td className="px-4 py-4"><div className="h-2.5 bg-slate-200 dark:bg-slate-800 rounded w-28 mb-1.5" /><div className="h-2 bg-slate-100 dark:bg-slate-700 rounded w-24" /></td>
                         <td className="px-4 py-4 text-right"><div className="h-7 bg-slate-200 dark:bg-slate-800 rounded-xl w-24 ml-auto" /></td>
                       </tr>
                     ))
                   ) : filteredData.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-16 text-slate-400 text-sm font-bold">
+                      <td colSpan={5} className="text-center py-16 text-slate-400 text-sm font-bold">
                         <Building2 className="w-8 h-8 mx-auto mb-2 text-slate-300 dark:text-slate-700" />
                         No restaurants found
                       </td>
@@ -361,13 +359,6 @@ export default function AdminMasterControlView({
                             <div className="text-[10px] text-slate-400 mt-0.5">
                               {rest.phone || '—'}
                             </div>
-                          </td>
-
-                          {/* ── Role Badge ── */}
-                          <td className="px-4 py-3.5">
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-                              owner
-                            </span>
                           </td>
 
                           {/* ── Status & Expiry ── */}

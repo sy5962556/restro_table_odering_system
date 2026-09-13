@@ -201,10 +201,7 @@ export default function TenantWorkspaceView({
             {/* Badge Row */}
             <div className="flex flex-wrap items-center gap-2">
               <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                🍽️ Restaurant Portal
-              </span>
-              <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-slate-800 text-slate-300 border border-slate-700">
-                Role: OWNER
+                🍽️ Restaurant Workspace
               </span>
               {isOnline ? (
                 <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -354,12 +351,7 @@ export default function TenantWorkspaceView({
                       <span className="text-slate-400 font-semibold">Last Login</span>
                       <span className="font-bold text-slate-700 dark:text-slate-200">{formatDate(owner.lastLogin)}</span>
                     </div>
-                    <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
-                      <span className="text-slate-400 font-semibold">Status</span>
-                      <span className={`font-bold ${subIsActive ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {timeAgo(owner.lastLogin)}
-                      </span>
-                    </div>
+
                     <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
                       <span className="text-slate-400 font-semibold">Plan Expires</span>
                       <span className="font-bold text-slate-700 dark:text-slate-200">
@@ -388,7 +380,7 @@ export default function TenantWorkspaceView({
                       { label: 'Restaurant Name', value: restaurant.name },
                       { label: 'Owner Name', value: owner.name || '—' },
                       { label: 'Owner Mobile', value: owner.mobile || restaurant.phone || '—' },
-                      { label: 'Lab/Admin Email', value: owner.email || restaurant.email || '—' },
+                      { label: 'Owner / Admin Email', value: owner.email || restaurant.email || '—' },
                       { label: 'GST Number', value: restaurant.gstNumber || 'N/A' },
                     ].map(row => (
                       <div key={row.label} className="flex justify-between items-center py-1.5 border-b border-slate-100 dark:border-slate-800 last:border-0">
